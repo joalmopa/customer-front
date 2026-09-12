@@ -1,0 +1,53 @@
+name: Build and test feature branch
+
+# "on" define QUE evento dispara el workflow.
+on:
+  # Se dispara cuando haces git push (no en pull request, ni en merge a develop/main).
+  push:
+    branches:
+      # Patron glob: coincide con feature/lo-que-sea (ej. feature/add-build-wrokflow).
+      # No coincide con feature/a/b (un slash extra). Para eso usarias feature/**
+      - feature/*
+
+# Un workflow tiene uno o mas jobs. Cada job corre en su propia maquina virtual (runner).
+jobs:
+  # Identificador interno del job (sin espacios). Es lo que ves como recuadro en el grafo.
+  build-feature:
+    # Imagen del runner. ubuntu-latest = Ubuntu en la nube, con git, curl, etc. ya instalados.
+    # Node en la version del proyecto NO viene listo: por eso el paso setup-node mas abajo.
+    runs-on: ubuntu-latest
+
+    # Pasos en orden. Si uno falla, los siguientes no se ejecutan.
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          # README pide Node 18 LTS. Angular 15 soporta 18.x.
+          node-version: 18
+          # cache: npm usa package-lock.json para reutilizar descargas entre runs.
+          cache: npm
+
+      - name: Install npm packages
+        # Equivale a lo que haces en local con "npm install".
+        # Lee package.json + package-lock.json y crea node_modules:
+        #   - @angular/core, @angular/cli, @angular/material, etc.
+        # No hace falta "npm install -g @angular/cli": Angular ya esta en devDependencies.
+        # En CI se prefiere "npm ci" (instala EXACTO el lockfile). "npm install" tambien vale para el curso.
+        run: npm ci
+
+      - name: Verify Angular CLI
+        # Confirma que Angular quedo instalado en node_modules (sale la version 15.x).
+        run: npx ng version
+
+#      - name: Run unit tests
+#        # --watch=false: en CI no hay nadie mirando; si no, Karma se queda abierto y el job nunca termina.
+#        # --browsers=ChromeHeadless: Chrome sin interfaz (el runner de GitHub no tiene pantalla).
+#        run: npm test -- --watch=false --browsers=ChromeHeadless --progress=false
+
+      - name: Build production
+        # Usa el script "build" de package.json: ng build --configuration production --aot
+        run: npm run build
